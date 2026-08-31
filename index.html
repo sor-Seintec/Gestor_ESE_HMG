@@ -922,7 +922,7 @@ html>body{padding:0}</style>
       <span class="ure-nav-label">Cadastros</span>
       <button type="button" class="ure-nav-item ure-master-only" id="openAdministratorRegistry" hidden><i data-lucide="shield-user" aria-hidden="true"></i><span>Administradores</span></button>
       <button type="button" class="ure-nav-item ure-master-only" id="openSupervisorRegistry" hidden><i data-lucide="user-round" aria-hidden="true"></i><span>Supervisores</span></button>
-      <button type="button" class="ure-nav-item" id="openSchoolRegistry"><i data-lucide="school" aria-hidden="true"></i><span>Escolas</span></button>
+      <button type="button" class="ure-nav-item ure-master-only" id="openSchoolRegistry" hidden><i data-lucide="school" aria-hidden="true"></i><span>Escolas</span></button>
       <button type="button" class="ure-nav-item" data-url="meta.html?abrir=metas"><i data-lucide="target" aria-hidden="true"></i><span>Metas</span></button>
       <span class="ure-nav-label ure-master-only" hidden>Sistema</span>
       <button type="button" class="ure-nav-item ure-master-only" id="openBackupRegistry" hidden><i data-lucide="database-backup" aria-hidden="true"></i><span>Backup e restauração</span></button>
@@ -946,6 +946,7 @@ html>body{padding:0}</style>
         <h1 id="welcomeTitle">Bem-vindo ao Portal URE.</h1>
       </div>
       <div class="ure-top-actions">
+        <button type="button" class="ure-search" id="refreshButton"><span>Atualizar</span></button>
         <button type="button" class="ure-search" id="searchOpenButton" aria-haspopup="dialog"><i data-lucide="search" aria-hidden="true"></i><span>Buscar registros</span><kbd>Ctrl K</kbd></button>
         <button type="button" class="ure-icon-button" aria-label="Notificações"><i data-lucide="bell" aria-hidden="true"></i><span></span></button>
       </div>
@@ -2160,7 +2161,7 @@ html>body{padding:0}</style>
     activateAdministratorAccess, activateSupervisorAccess, addSchoolSupervisor, auth, authErrorMessage, createSchoolRecord, createSupervisorProfile, dataErrorMessage, MASTER_ADMIN_EMAIL,
     loadGestorData, loginAdmin, logoutAdmin, prepareOperationalSanitization, requireAdmin, restoreOperationalBackup, sanitizeOperationalTestData, setSchoolActive, setSupervisorActive,
     removeSchoolSupervisor
-  } from './firebase-gestor.js';
+  } from './firebase-gestor.js?v=20260828-access-fix-3';
   const loginScreen = document.getElementById('loginScreen');
   const loginMessage = document.getElementById('loginMessage');
   let dataLoaded = false;
@@ -2177,6 +2178,7 @@ html>body{padding:0}</style>
       const session = await loginAdmin(email, password);
       await activateSession(session);
     } catch (error) {
+      console.error('[Gestor-ESE] Falha ao autenticar ou montar a sessão administrativa:', error);
       loginMessage.textContent = authErrorMessage(error);
       loginScreen.hidden = false;
       loginScreen.style.display = 'flex';
@@ -2206,7 +2208,7 @@ html>body{padding:0}</style>
       : label.slice(0,2).toUpperCase();
     document.getElementById('userAvatar').textContent = initials;
     document.getElementById('userName').textContent = label;
-    const isMaster=(user.email||'').trim().toLowerCase()===MASTER_ADMIN_EMAIL;
+    const isMaster=profile.isMaster===true||(user.email||'').trim().toLowerCase()===MASTER_ADMIN_EMAIL;
     document.querySelectorAll('.ure-master-only').forEach((item)=>{item.hidden=!isMaster});
     document.getElementById('userRole').textContent = isMaster ? 'Administrador Master' : 'Administrador';
     document.getElementById('welcomeTitle').textContent = `Bem-vindo, ${parts[0]}.`;
@@ -2217,9 +2219,17 @@ html>body{padding:0}</style>
   }
 
   window.getGestorFirebaseData = loadGestorData;
+  document.getElementById('refreshButton')?.addEventListener('click', async () => {
+    const button = document.getElementById('refreshButton');
+    button.disabled = true;
+    button.classList.add('is-syncing');
+    try { await window.loadPortalData?.(true); }
+    finally { button.disabled = false; button.classList.remove('is-syncing'); }
+  });
   try {
     await activateSession(await requireAdmin());
   } catch (error) {
+    console.error('[Gestor-ESE] Falha ao restaurar a sessão administrativa:', error);
     dataLoaded = false;
     loginScreen.hidden = false;
     loginScreen.style.display = 'flex';
